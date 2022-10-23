@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 
@@ -48,11 +49,11 @@ namespace Vaccination
                 }
                 else if (selected == 3)
                 {
-
+                    inputData = ReadNewPath(true);
                 }
                 else if (selected == 4)
                 {
-
+                    outputData = ReadNewPath(false);
                 }
                 else if (selected == 5)
                 {
@@ -76,6 +77,37 @@ namespace Vaccination
             return new string[0];
         }
 
+        public static string ReadNewPath(bool checkFile)
+        {
+            Console.Clear();
+            Console.Write("Ange ny sökväg: ");
+            string newPath = Console.ReadLine();
+            bool validFile = File.Exists(@newPath);
+            bool validDirectory = Directory.Exists(@newPath);
+            if (checkFile)
+            {
+                if (validFile)
+                    return newPath;
+                else
+                {
+                    Console.WriteLine("Ogiltig sökväg.");
+                    Thread.Sleep(1500);
+                    return ReadNewPath(checkFile);
+                }
+            }
+            else 
+            {
+                if (validFile || validDirectory)
+                    return newPath;
+                else
+                {
+                    Console.WriteLine("Ogiltig sökväg.");
+                    Thread.Sleep(1500);
+                    return ReadNewPath(checkFile);
+                }
+            }
+
+        }
         public static int ReadInt(string prompt)
         {
             Console.Clear();
