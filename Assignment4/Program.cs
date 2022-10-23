@@ -1,8 +1,10 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 
 namespace Vaccination
 {
@@ -12,12 +14,12 @@ namespace Vaccination
         {
             int doses = 0;
             bool minors = false;
-            string minorsMenu = minors ? "Ja" : "Nej";
             string inputData = @"C:\Windows\Temp\People.csv";
             string outputData = @"C:\Windows\Temp\Vaccinations.csv";
 
             while (true)
             {
+                string minorsMenu = minors ? "Ja" : "Nej";
 
 
                 Console.Clear();
@@ -31,7 +33,31 @@ namespace Vaccination
 
                 int selected = ShowMenu("Vad vill du göra?", new[] { "Skapa prioritetsordning", "Ändra antal vaccindoser", "Ändra åldersgräns", "Ändra indatafil", "Ändra utdatafil", "Avsluta" });
 
+                if (selected == 0)
+                {
 
+                }
+                else if (selected == 1)
+                {
+                    doses = ReadInt("Ange nytt antal doser: ");
+                }
+                else if (selected == 2)
+                {
+                    Console.Clear();
+                    minors = ShowMenu("Ska personer under 18 vaccineras?", new[] { "Ja", "Nej" }) == 0;
+                }
+                else if (selected == 3)
+                {
+
+                }
+                else if (selected == 4)
+                {
+
+                }
+                else if (selected == 5)
+                {
+                    break;
+                }
             }
 
 
@@ -48,6 +74,35 @@ namespace Vaccination
         {
             // Replace with your own code.
             return new string[0];
+        }
+
+        public static int ReadInt(string prompt)
+        {
+            Console.Clear();
+            Console.Write(prompt);
+            string input = Console.ReadLine();
+            int number;
+            bool isValid = int.TryParse(input, out number);
+            if (isValid)
+            {
+                number = int.Parse(input);
+                if (number >= 0)
+                    return number;
+                else
+                {
+                    Console.WriteLine("Kan inte vara mindre än 0!");
+                    Thread.Sleep(1500);
+                    return ReadInt(prompt);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Ogiltig inmatning");
+                Thread.Sleep(1500);
+                return ReadInt(prompt);
+            }
+
+
         }
 
         public static int ShowMenu(string prompt, IEnumerable<string> options)
