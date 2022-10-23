@@ -11,9 +11,10 @@ namespace Vaccination
 {
     public class Program
     {
+        private static int doses = 0;
+
         public static void Main()
         {
-            int doses = 0;
             bool minors = false;
             string inputData = @"C:\Windows\Temp\People.csv";
             string outputData = @"C:\Windows\Temp\Vaccinations.csv";
