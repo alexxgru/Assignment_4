@@ -5,24 +5,77 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Threading;
 
 namespace Vaccination
 {
+    public class Patient
+    {
+        public string BirthNumber;
+        public int Age;
+        public string FirstName;
+        public string LastName;
+        public bool Medical;
+        public bool Risk;
+        public int DosesGet;
+
+
+
+        public Patient(string fname, string surname, string birthyear, int med, int risk, int infected)
+        {
+           FirstName = fname;
+           LastName = surname;
+           BirthNumber = FormatBirthdate(birthyear);
+           Age = GetAge(BirthNumber);
+           Medical = med == 1;
+           Risk = risk == 1;
+           DosesGet = 2 - infected; 
+           
+        }
+        public string FormatBirthdate(string birth)
+        {
+            
+            string newFormat = birth;
+
+            if (birth.Length <= 11)
+            {
+                if (int.Parse(birth.Substring(0, 2)) > 22)
+                    newFormat = 19 + birth;
+                else
+                    newFormat = 20 + birth;
+            }
+            if (newFormat[8] != '-')
+            {
+                newFormat = newFormat.Substring(0, 8) + '-' + newFormat.Substring(8);
+            }
+
+            return newFormat;
+
+        }
+
+        public int GetAge(string birthyear)
+        {
+            int birth = int.Parse(birthyear.Substring(0, 8));
+            int now = int.Parse(DateTime.Now.ToString("yyyyMMdd"));
+            int age = (now - birth) / 10000;
+            return age;
+        }
+    }
+
     public class Program
     {
-        private static int doses = 0;
+        private static int doses = 20;
+        private static string inputData = @"C:\Windows\Temp\People.csv";
+        private static string outputData = @"C:\Windows\Temp\Vaccinations.csv";
 
         public static void Main()
         {
             bool minors = false;
-            string inputData = @"C:\Windows\Temp\People.csv";
-            string outputData = @"C:\Windows\Temp\Vaccinations.csv";
 
             while (true)
             {
                 string minorsMenu = minors ? "Ja" : "Nej";
-
 
                 Console.Clear();
                 Console.WriteLine("Huvudmeny");
@@ -37,7 +90,7 @@ namespace Vaccination
 
                 if (selected == 0)
                 {
-
+                    CreateVaccinationOrder(File.ReadAllLines(inputData), doses, minors);
                 }
                 else if (selected == 1)
                 {
@@ -72,10 +125,75 @@ namespace Vaccination
         // input: the lines from a CSV file containing population information
         // doses: the number of vaccine doses available
         // vaccinateChildren: whether to vaccinate people younger than 18
+
+        public static List<Patient> OrderPersons(string[] people)
+        {
+            int errorCount = 0;
+            List<Patient> result = new List<Patient>();
+
+            foreach (string p in people)
+            {
+                string[] fields = p.Split(',');
+
+                if (fields.Any(x => x.Length == 0))
+                {
+                    errorCount++;
+                }
+                else
+                {
+                    try
+                    {
+                        Patient person = new Patient(fields[2], fields[1], fields[0], int.Parse(fields[3]), int.Parse(fields[4]), int.Parse(fields[5]));
+                        result.Add(person);
+                    }
+                    catch
+                    {
+                        errorCount++;
+                    }
+                }
+
+            }
+
+            if (errorCount > 0)
+            {
+                Console.Clear();
+                Console.WriteLine($"There were errors on {errorCount} lines while reading CSV-file!");
+                Program.Main();
+
+            }
+
+            List<Patient> medWorkers = result.Where(x => x.Medical).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
+            List<Patient> aboveSixtyFive = result.Where(x => x.Age >= 65 && !x.Medical).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
+            List<Patient> riskZone = result.Where(x => x.Risk && !x.Medical && !(x.Age >= 65)).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
+            List<Patient> remaining = result.Where(x => !x.Medical && !(x.Age >=65) && !x.Risk).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
+
+            return medWorkers.Concat(aboveSixtyFive).Concat(riskZone).Concat(remaining).ToList();
+        }
+
+
         public static string[] CreateVaccinationOrder(string[] input, int doses, bool vaccinateChildren)
         {
-            // Replace with your own code.
-            return new string[0];
+            int dosesLeft = doses;
+            List<Patient> sortedList = OrderPersons(input);
+            List<string> finalList = new List<string>();
+
+
+            if (!vaccinateChildren)
+                sortedList = sortedList.Where(x => x.Age >= 18).ToList();
+
+            foreach (Patient person in sortedList)
+            {
+                if (dosesLeft >= person.DosesGet)
+                {
+                    finalList.Add($"{person.BirthNumber},{person.LastName},{person.FirstName},{person.DosesGet}");
+                    dosesLeft -= person.DosesGet;
+                }
+            }
+
+            File.WriteAllLines(outputData, finalList.ToArray());
+
+            return finalList.ToArray();
+            
         }
 
         public static string ReadNewPath(bool checkFile)
@@ -219,6 +337,8 @@ namespace Vaccination
     [TestClass]
     public class ProgramTests
     {
+
+
         [TestMethod]
         public void ExampleTest()
         {
