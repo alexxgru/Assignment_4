@@ -16,8 +16,7 @@ namespace Vaccination
         public int Age;
         public string FirstName;
         public string LastName;
-        public bool Medical;
-        public bool Risk;
+        public int VaccinationGroup;
         public int DosesGet;
 
 
@@ -28,11 +27,19 @@ namespace Vaccination
            LastName = surname;
            BirthNumber = FormatBirthdate(birthyear);
            Age = GetAge(BirthNumber);
-           Medical = med == 1;
-           Risk = risk == 1;
+           VaccinationGroup = GetVaccinationGroup(med, risk);
            DosesGet = 2 - infected; 
            
         }
+
+        public int GetVaccinationGroup(int med, int risk)
+        {
+
+            int group = med == 1 ? 1 : Age >= 65 ? 2 : risk == 1 ? 3 : 4;
+
+            return group;
+        }
+
         public string FormatBirthdate(string birth)
         {
             
@@ -40,14 +47,14 @@ namespace Vaccination
 
             if (birth.Length <= 11)
             {
-                if (int.Parse(birth.Substring(0, 2)) > 22)
+                if (int.Parse(birth[..2]) > 22)
                     newFormat = 19 + birth;
                 else
                     newFormat = 20 + birth;
             }
             if (newFormat[8] != '-')
             {
-                newFormat = newFormat.Substring(0, 8) + '-' + newFormat.Substring(8);
+                newFormat = newFormat[..8] + '-' + newFormat[8..];
             }
 
             return newFormat;
@@ -56,7 +63,7 @@ namespace Vaccination
 
         public int GetAge(string birthyear)
         {
-            int birth = int.Parse(birthyear.Substring(0, 8));
+            int birth = int.Parse(birthyear[..8]);
             int now = int.Parse(DateTime.Now.ToString("yyyyMMdd"));
             int age = (now - birth) / 10000;
             return age;
@@ -162,12 +169,14 @@ namespace Vaccination
 
             }
 
-            List<Patient> medWorkers = result.Where(x => x.Medical).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
-            List<Patient> aboveSixtyFive = result.Where(x => x.Age >= 65 && !x.Medical).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
-            List<Patient> riskZone = result.Where(x => x.Risk && !x.Medical && !(x.Age >= 65)).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
-            List<Patient> remaining = result.Where(x => !x.Medical && !(x.Age >=65) && !x.Risk).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
+            //List<Patient> medWorkers = result.Where(x => x.Medical).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
+            //List<Patient> aboveSixtyFive = result.Where(x => x.Age >= 65 && !x.Medical).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
+            //List<Patient> riskZone = result.Where(x => x.Risk && !x.Medical && !(x.Age >= 65)).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
+            //List<Patient> remaining = result.Where(x => !x.Medical && !(x.Age >=65) && !x.Risk).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
 
-            return medWorkers.Concat(aboveSixtyFive).Concat(riskZone).Concat(remaining).ToList();
+            //return medWorkers.Concat(aboveSixtyFive).Concat(riskZone).Concat(remaining).ToList();
+
+            return result.OrderBy(x => x.VaccinationGroup).ThenBy(x => int.Parse(x.BirthNumber[..8])).ToList();
         }
 
 
