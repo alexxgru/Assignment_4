@@ -74,7 +74,7 @@ namespace Vaccination
     {
         private static int doses = 20;
         private static string inputData = @"C:\Windows\Temp\People.csv";
-        private static string outputData = @"C:\Windows\Temp\Vaccinations.csv";
+        private static string outputPath = @"C:\Windows\Temp\Vaccinations.csv";
 
         public static void Main()
         {
@@ -82,7 +82,7 @@ namespace Vaccination
 
             while (true)
             {
-                string minorsMenu = minors ? "Ja" : "Nej";
+                string minorsMenu = minors ? "Ja" : "Nej"; 
 
                 Console.Clear();
                 Console.WriteLine("Huvudmeny");
@@ -90,14 +90,14 @@ namespace Vaccination
                 Console.WriteLine($"Antal tillgängliga vaccindoser {doses}");
                 Console.WriteLine($"Vaccinering under 18 år: {minorsMenu}");
                 Console.WriteLine($"Indatafil: {inputData}");
-                Console.WriteLine($"Utdatafil: {outputData}");
+                Console.WriteLine($"Utdatafil: {outputPath}");
                 Console.WriteLine();
 
                 int selected = ShowMenu("Vad vill du göra?", new[] { "Skapa prioritetsordning", "Ändra antal vaccindoser", "Ändra åldersgräns", "Ändra indatafil", "Ändra utdatafil", "Avsluta" });
 
                 if (selected == 0)
                 {
-                    CreateVaccinationOrder(File.ReadAllLines(inputData), doses, minors);
+                    WriteCSV(CreateVaccinationOrder(File.ReadAllLines(inputData), doses, minors));
                 }
                 else if (selected == 1)
                 {
@@ -114,7 +114,7 @@ namespace Vaccination
                 }
                 else if (selected == 4)
                 {
-                    outputData = ReadNewPath(false);
+                    outputPath = ReadNewPath(false);
                 }
                 else if (selected == 5)
                 {
@@ -133,14 +133,16 @@ namespace Vaccination
         // doses: the number of vaccine doses available
         // vaccinateChildren: whether to vaccinate people younger than 18
 
-        public static List<Patient> OrderPersons(string[] people)
+        public static string[] CreateVaccinationOrder(string[] input, int doses, bool vaccinateChildren)
         {
             int errorCount = 0;
-            List<Patient> result = new List<Patient>();
+            int dosesLeft = doses;
+            List<Patient> sortedList = new List<Patient>();
+            List<string> finalList = new List<string>();
 
-            foreach (string p in people)
+            foreach (string person in input)
             {
-                string[] fields = p.Split(',');
+                string[] fields = person.Split(',');
 
                 if (fields.Any(x => x.Length == 0))
                 {
@@ -150,8 +152,8 @@ namespace Vaccination
                 {
                     try
                     {
-                        Patient person = new Patient(fields[2], fields[1], fields[0], int.Parse(fields[3]), int.Parse(fields[4]), int.Parse(fields[5]));
-                        result.Add(person);
+                        Patient patient = new Patient(fields[2], fields[1], fields[0], int.Parse(fields[3]), int.Parse(fields[4]), int.Parse(fields[5]));
+                        sortedList.Add(patient);
                     }
                     catch
                     {
@@ -164,28 +166,12 @@ namespace Vaccination
             if (errorCount > 0)
             {
                 Console.Clear();
-                Console.WriteLine($"There were errors on {errorCount} lines while reading CSV-file!");
+                Console.WriteLine($"Fel vid inläsning av CSV-fil på {errorCount} rader.");
                 Program.Main();
 
             }
-
-            //List<Patient> medWorkers = result.Where(x => x.Medical).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
-            //List<Patient> aboveSixtyFive = result.Where(x => x.Age >= 65 && !x.Medical).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
-            //List<Patient> riskZone = result.Where(x => x.Risk && !x.Medical && !(x.Age >= 65)).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
-            //List<Patient> remaining = result.Where(x => !x.Medical && !(x.Age >=65) && !x.Risk).OrderBy(x => int.Parse(x.BirthNumber.Substring(0, 8))).ToList();
-
-            //return medWorkers.Concat(aboveSixtyFive).Concat(riskZone).Concat(remaining).ToList();
-
-            return result.OrderBy(x => x.VaccinationGroup).ThenBy(x => int.Parse(x.BirthNumber[..8])).ToList();
-        }
-
-
-        public static string[] CreateVaccinationOrder(string[] input, int doses, bool vaccinateChildren)
-        {
-            int dosesLeft = doses;
-            List<Patient> sortedList = OrderPersons(input);
-            List<string> finalList = new List<string>();
-
+            
+            sortedList = sortedList.OrderBy(x => x.VaccinationGroup).ThenBy(x => int.Parse(x.BirthNumber[..8])).ToList();
 
             if (!vaccinateChildren)
                 sortedList = sortedList.Where(x => x.Age >= 18).ToList();
@@ -199,19 +185,57 @@ namespace Vaccination
                 }
             }
 
-            File.WriteAllLines(outputData, finalList.ToArray());
-
             return finalList.ToArray();
             
+        }
+
+        public static void WriteCSV(string[] input)
+        {
+            Console.Clear();
+            bool write = true;
+
+            if (File.Exists(outputPath))
+            {
+                int selected = ShowMenu($"Filen {outputPath} finns redan, vill du ersätta innehållet i filen?", new[] {"Ja","Nej"});
+
+                if (selected == 1)
+                {
+                    write = false;
+                    Console.WriteLine("Filen har inte ändrats");
+                    Thread.Sleep(1500);
+                }
+
+            }
+
+            if (write)
+            {
+                try
+                {
+                    File.WriteAllLines(outputPath, input);
+                    Console.WriteLine($"Resultatet har sparats i {outputPath}");
+                    Thread.Sleep(1500);
+                }
+                catch
+                {
+                    Console.WriteLine("Det gick inte att skriva till filen");
+                    Console.WriteLine("Ändra sökväg och försök igen!");
+                    Thread.Sleep(1500);
+                }
+            }
         }
 
         public static string ReadNewPath(bool checkFile)
         {
             Console.Clear();
             Console.Write("Ange ny sökväg: ");
+
             string newPath = Console.ReadLine();
             bool validFile = File.Exists(@newPath);
-            bool validDirectory = Directory.Exists(@newPath);
+            bool validDirectory = Directory.Exists(newPath);
+
+            if(!validDirectory)
+                validDirectory = Directory.Exists(Directory.GetParent(@newPath).ToString());
+            
             if (checkFile)
             {
                 if (validFile)
@@ -225,7 +249,7 @@ namespace Vaccination
             }
             else 
             {
-                if (validFile || validDirectory)
+                if (validDirectory)
                     return newPath;
                 else
                 {
