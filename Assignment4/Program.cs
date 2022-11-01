@@ -75,10 +75,10 @@ namespace Vaccination
         private static int doses = 20;
         private static string inputData = @"C:\Windows\Temp\People.csv";
         private static string outputPath = @"C:\Windows\Temp\Vaccinations.csv";
+        private static bool minors = false;
 
         public static void Main()
         {
-            bool minors = false;
 
             while (true)
             {
@@ -273,7 +273,7 @@ namespace Vaccination
             string newPath = Console.ReadLine();
             bool validFile = File.Exists(@newPath);
             bool isDirectory = Directory.Exists(newPath);
-            bool inValidDir = Directory.Exists(Directory.GetParent(@newPath).ToString());
+            bool insideValidDir = Directory.Exists(Directory.GetParent(@newPath).ToString());
 
             if (checkFile)
             {
@@ -288,7 +288,7 @@ namespace Vaccination
             }
             else 
             {
-                if (!isDirectory && inValidDir)
+                if (!isDirectory && insideValidDir)
                     return newPath;
                 else
                 {
