@@ -93,32 +93,44 @@ namespace Vaccination
                 Console.WriteLine($"Utdatafil: {outputPath}");
                 Console.WriteLine();
 
-                int selected = ShowMenu("Vad vill du göra?", new[] { "Skapa prioritetsordning", "Ändra antal vaccindoser", "Ändra åldersgräns", "Ändra indatafil", "Ändra utdatafil", "Avsluta" });
+                int selected = ShowMenu("Vad vill du göra?", new[] { "Skapa prioritetsordning", "Schemalägg vaccinationer", "Ändra antal vaccindoser", "Ändra åldersgräns", "Ändra indatafil", "Ändra utdatafil", "Avsluta" });
 
-                if (selected == 0)
+                try
                 {
-                    WriteCSV(CreateVaccinationOrder(File.ReadAllLines(inputData), doses, minors));
+                    if (selected == 0)
+                    {
+                        WriteCSV(CreateVaccinationOrder(File.ReadAllLines(inputData), doses, minors));
+                    }
+                    else if (selected == 1)
+                    {
+                        CreateVaccinationCalendar();
+                    }
+                    else if (selected == 2)
+                    {
+                        doses = ReadInt("Ange nytt antal doser: ");
+                    }
+                    else if (selected == 3)
+                    {
+                        Console.Clear();
+                        minors = ShowMenu("Ska personer under 18 vaccineras?", new[] { "Ja", "Nej" }) == 0;
+                    }
+                    else if (selected == 4)
+                    {
+                        inputData = ReadNewPath(true);
+                    }
+                    else if (selected == 5)
+                    {
+                        outputPath = ReadNewPath(false);
+                    }
+                    else if (selected == 6)
+                    {
+                        break;
+                    }
                 }
-                else if (selected == 1)
+                catch (Exception ex)
                 {
-                    doses = ReadInt("Ange nytt antal doser: ");
-                }
-                else if (selected == 2)
-                {
-                    Console.Clear();
-                    minors = ShowMenu("Ska personer under 18 vaccineras?", new[] { "Ja", "Nej" }) == 0;
-                }
-                else if (selected == 3)
-                {
-                    inputData = ReadNewPath(true);
-                }
-                else if (selected == 4)
-                {
-                    outputPath = ReadNewPath(false);
-                }
-                else if (selected == 5)
-                {
-                    break;
+                    Console.WriteLine(ex.Message);
+                    Thread.Sleep(1500);
                 }
             }
 
@@ -133,12 +145,35 @@ namespace Vaccination
         // doses: the number of vaccine doses available
         // vaccinateChildren: whether to vaccinate people younger than 18
 
-        public static string[] CreateVaccinationOrder(string[] input, int doses, bool vaccinateChildren)
+        public static void CreateVaccinationCalendar()
         {
+            DateTime startDate = DateTime.Now.AddDays(7);
+            string startTime = "8:00";
+            string endTime = "20:00";
+            int simultaneous = 2;
+            int minutesPerVisit = 5;
+            string newPath = @"C:\Windows\Temp\Schedule.ics";
+
+            Console.Clear();
+            Console.WriteLine("Schemalägg vaccinationer");
+            Console.WriteLine("---------");
+            Console.WriteLine("Mata in blankrad för att välja standardvärde");
+            Console.WriteLine();
+
+            Console.Write("");
+
+
+
+
+
+
+        }
+
+        public static List<Patient> OrderPatients(string[] input, bool vaccinateChildren)
+        {
+
             int errorCount = 0;
-            int dosesLeft = doses;
             List<Patient> sortedList = new List<Patient>();
-            List<string> finalList = new List<string>();
 
             foreach (string person in input)
             {
@@ -165,18 +200,24 @@ namespace Vaccination
 
             if (errorCount > 0)
             {
-                Console.Clear();
-                Console.WriteLine($"Fel vid inläsning av CSV-fil på {errorCount} rader.");
-                Program.Main();
-
+                throw new ArgumentException($"Fel vid inläsning av CSV-fil på {errorCount} rader.");
             }
-            
-            sortedList = sortedList.OrderBy(x => x.VaccinationGroup).ThenBy(x => int.Parse(x.BirthNumber[..8])).ToList();
-
             if (!vaccinateChildren)
                 sortedList = sortedList.Where(x => x.Age >= 18).ToList();
 
-            foreach (Patient person in sortedList)
+            return sortedList.OrderBy(x => x.VaccinationGroup).ThenBy(x => int.Parse(x.BirthNumber[..8])).ToList();
+
+
+
+        }
+
+        public static string[] CreateVaccinationOrder(string[] input, int doses, bool vaccinateChildren)
+        {
+            int dosesLeft = doses;
+            var orderedList = OrderPatients(input, vaccinateChildren);
+            List<string> finalList = new List<string>();
+
+            foreach (Patient person in orderedList)
             {
                 if (dosesLeft >= person.DosesGet)
                 {
@@ -231,11 +272,9 @@ namespace Vaccination
 
             string newPath = Console.ReadLine();
             bool validFile = File.Exists(@newPath);
-            bool validDirectory = Directory.Exists(newPath);
+            bool isDirectory = Directory.Exists(newPath);
+            bool inValidDir = Directory.Exists(Directory.GetParent(@newPath).ToString());
 
-            if(!validDirectory)
-                validDirectory = Directory.Exists(Directory.GetParent(@newPath).ToString());
-            
             if (checkFile)
             {
                 if (validFile)
@@ -249,7 +288,7 @@ namespace Vaccination
             }
             else 
             {
-                if (validDirectory)
+                if (!isDirectory && inValidDir)
                     return newPath;
                 else
                 {
@@ -260,6 +299,7 @@ namespace Vaccination
             }
 
         }
+
         public static int ReadInt(string prompt)
         {
             Console.Clear();
