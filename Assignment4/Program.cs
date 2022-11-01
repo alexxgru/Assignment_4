@@ -6,6 +6,8 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Threading;
 
 namespace Vaccination
@@ -19,17 +21,15 @@ namespace Vaccination
         public int VaccinationGroup;
         public int DosesGet;
 
-
-
         public Patient(string fname, string surname, string birthyear, int med, int risk, int infected)
         {
-           FirstName = fname;
-           LastName = surname;
-           BirthNumber = FormatBirthdate(birthyear);
-           Age = GetAge(BirthNumber);
-           VaccinationGroup = GetVaccinationGroup(med, risk);
-           DosesGet = 2 - infected; 
-           
+            FirstName = fname;
+            LastName = surname;
+            BirthNumber = FormatBirthdate(birthyear);
+            Age = GetAge(BirthNumber);
+            VaccinationGroup = GetVaccinationGroup(med, risk);
+            DosesGet = 2 - infected;
+
         }
 
         public int GetVaccinationGroup(int med, int risk)
@@ -42,7 +42,7 @@ namespace Vaccination
 
         public string FormatBirthdate(string birth)
         {
-            
+
             string newFormat = birth;
 
             if (birth.Length <= 11)
@@ -82,7 +82,7 @@ namespace Vaccination
 
             while (true)
             {
-                string minorsMenu = minors ? "Ja" : "Nej"; 
+                string minorsMenu = minors ? "Ja" : "Nej";
 
                 Console.Clear();
                 Console.WriteLine("Huvudmeny");
@@ -107,7 +107,9 @@ namespace Vaccination
                     }
                     else if (selected == 2)
                     {
-                        doses = ReadInt("Ange nytt antal doser: ");
+                        Console.Clear();
+                        Console.WriteLine("Ange nytt antal doser: ");
+                        doses = ReadInt();
                     }
                     else if (selected == 3)
                     {
@@ -145,10 +147,15 @@ namespace Vaccination
         // doses: the number of vaccine doses available
         // vaccinateChildren: whether to vaccinate people younger than 18
 
+        
+
         public static void CreateVaccinationCalendar()
         {
-            DateTime startDate = DateTime.Now.AddDays(7);
-            string startTime = "8:00";
+            StringBuilder sb = new StringBuilder();
+            var sortedList = OrderPatients(File.ReadAllLines(inputData),minors);
+            int dosesLeft = doses;
+            DateTime startDate = new DateTime();
+            string startTime = "08:00";
             string endTime = "20:00";
             int simultaneous = 2;
             int minutesPerVisit = 5;
@@ -159,13 +166,111 @@ namespace Vaccination
             Console.WriteLine("---------");
             Console.WriteLine("Mata in blankrad för att välja standardvärde");
             Console.WriteLine();
+            startDate = GetDate();
 
-            Console.Write("");
+            string startTimeInput = GetTime("Startid: ");
+            if (startTimeInput != "")
+                startTime = startTimeInput;
+
+            string endTimeInput = GetTime("Sluttid: ");
+            if (endTimeInput != "")
+                endTime = endTimeInput;
+
+            Console.Write("Antal samtidiga vaccinationer: ");
+            
+            string inputA = Console.ReadLine();
+            if (inputA != "")
+                simultaneous = ReadInt(inputA);
+
+
+            Console.Write("Minuter per vaccination: ");
+            string inputB = Console.ReadLine();
+            if (inputB != "")
+                minutesPerVisit = ReadInt(inputB);
+
+            string inputC = ReadICSPath("Kalenderfil: ");
+            if (inputC != "")
+                newPath = inputC;
+
+
+            startDate = startDate. = TimeSpan.Parse(startTime).Hours;
+            int sameTime = 0;
+
+            foreach (Patient p in sortedList)
+            {
+
+                sb.AppendLine("BEGIN:VCALENDAR");
+                sb.AppendLine("VERSION:2.0");
+                sb.AppendLine("PRODID:stackoverflow.com");
+                sb.AppendLine("CALSCALE:GREGORIAN");
+                sb.AppendLine("METHOD:PUBLISH");
+
+                sb.AppendLine("BEGIN:VEVENT");
+                sb.AppendLine("DTSTART:" + startDate.ToString("yyyyMMddHHmm00"));
+                sb.AppendLine("DTEND:" + startDate.AddMinutes(minutesPerVisit).ToString("yyyyMMddHHmm00"));
+
+                sb.AppendLine($"SUMMARY: {p.FirstName} {p.LastName}");
+                sb.AppendLine("LOCATION:" + "Göteborg" + "");
+                sb.AppendLine("DESCRIPTION:" + " 1 dos gift" + "");
+                sb.AppendLine("PRIORITY:3");
+                sb.AppendLine("END:VEVENT");
+
+                sb.AppendLine("END:VCALENDAR");
 
 
 
+            }
+        }
+        public static DateTime GetDate()
+        {
+            Console.Write("Startdatum (YYYY-MM-DD): ");
+            string input = Console.ReadLine();
 
+            DateTime chosenDate;
 
+            if (input != "")
+            {
+                try
+                {
+                    chosenDate = DateTime.Parse(input);
+                }
+                catch
+                {
+                    Console.WriteLine("Felaktigt format - Prova igen.");
+                    Thread.Sleep(1500);
+                    Console.Clear();
+                    chosenDate = GetDate();
+                }
+
+            }
+            else
+            {
+                chosenDate = DateTime.Now.AddDays(7);
+
+            }
+
+            return chosenDate;
+        }
+
+        public static string GetTime(string prompt)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine();
+            TimeSpan time;
+            if (input != "")
+            {
+                if (TimeSpan.TryParse(input, out time))
+                    time = TimeSpan.Parse(input);
+                else
+                {
+                    Console.WriteLine("Felaktigt format");
+                    time = TimeSpan.Parse(GetTime(prompt));
+                }
+
+                return time.ToString();
+            }
+            else
+                return input;
 
         }
 
@@ -227,7 +332,7 @@ namespace Vaccination
             }
 
             return finalList.ToArray();
-            
+
         }
 
         public static void WriteCSV(string[] input)
@@ -237,7 +342,7 @@ namespace Vaccination
 
             if (File.Exists(outputPath))
             {
-                int selected = ShowMenu($"Filen {outputPath} finns redan, vill du ersätta innehållet i filen?", new[] {"Ja","Nej"});
+                int selected = ShowMenu($"Filen {outputPath} finns redan, vill du ersätta innehållet i filen?", new[] { "Ja", "Nej" });
 
                 if (selected == 1)
                 {
@@ -286,7 +391,7 @@ namespace Vaccination
                     return ReadNewPath(checkFile);
                 }
             }
-            else 
+            else
             {
                 if (!isDirectory && insideValidDir)
                     return newPath;
@@ -300,10 +405,35 @@ namespace Vaccination
 
         }
 
-        public static int ReadInt(string prompt)
+        public static string ReadICSPath(string prompt = "")
         {
-            Console.Clear();
-            Console.Write(prompt);
+            if (prompt != "")
+                Console.Write(prompt);
+            else
+                Console.WriteLine("Ange ny sökväg: ");
+
+            string newPath = Console.ReadLine();
+
+
+            if (newPath != "")
+            {
+                bool isDirectory = Directory.Exists(newPath);
+                bool insideValidDir = Directory.Exists(Directory.GetParent(@newPath).ToString());
+                if (!isDirectory && insideValidDir && newPath.EndsWith(".ics"))
+                    return newPath;
+                else
+                {
+                    Console.WriteLine("Ogiltig sökväg.");
+                    Thread.Sleep(1500);
+                    return ReadICSPath();
+                }
+            }
+            else
+                return "";
+
+        }
+        public static int ReadInt()
+        {
             string input = Console.ReadLine();
             int number;
             bool isValid = int.TryParse(input, out number);
@@ -314,16 +444,41 @@ namespace Vaccination
                     return number;
                 else
                 {
-                    Console.WriteLine("Kan inte vara mindre än 0!");
+                    Console.WriteLine("Kan inte vara mindre än 0 - Ange ny inmatning:");
                     Thread.Sleep(1500);
-                    return ReadInt(prompt);
+                    return ReadInt();
                 }
             }
             else
             {
-                Console.WriteLine("Ogiltig inmatning");
+                Console.WriteLine("Ogiltig inmatning - Ange ny inmatning:");
                 Thread.Sleep(1500);
-                return ReadInt(prompt);
+                return ReadInt();
+            }
+
+
+        }
+        public static int ReadInt(string input)
+        {
+            int number;
+            bool isValid = int.TryParse(input, out number);
+            if (isValid)
+            {
+                number = int.Parse(input);
+                if (number >= 0)
+                    return number;
+                else
+                {
+                    Console.WriteLine("Kan inte vara mindre än 0 - Ange ny inmatning:");
+                    Thread.Sleep(1500);
+                    return ReadInt();
+                }
+            }
+            else
+            {
+                Console.WriteLine("Ogiltig inmatning - Ange ny inmatning:");
+                Thread.Sleep(1500);
+                return ReadInt();
             }
 
 
