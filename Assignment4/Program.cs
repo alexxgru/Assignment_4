@@ -193,21 +193,24 @@ namespace Vaccination
                 newPath = inputC;
 
 
-            startDate = startDate. = TimeSpan.Parse(startTime).Hours;
+            //startDate = startDate TimeSpan.Parse(startTime).Hours;
             int sameTime = 0;
 
             foreach (Patient p in sortedList)
             {
+                startDate.AddMinutes(5);
 
                 sb.AppendLine("BEGIN:VCALENDAR");
                 sb.AppendLine("VERSION:2.0");
                 sb.AppendLine("PRODID:stackoverflow.com");
-                sb.AppendLine("CALSCALE:GREGORIAN");
+                //sb.AppendLine("CALSCALE:GREGORIAN");
                 sb.AppendLine("METHOD:PUBLISH");
 
                 sb.AppendLine("BEGIN:VEVENT");
-                sb.AppendLine("DTSTART:" + startDate.ToString("yyyyMMddHHmm00"));
-                sb.AppendLine("DTEND:" + startDate.AddMinutes(minutesPerVisit).ToString("yyyyMMddHHmm00"));
+                sb.AppendLine("DTSTAMP:" + startDate.ToString("yyyyMMddTHHmm00"));
+                sb.AppendLine("UID:19970901T130000Z-123401@example.com");
+                sb.AppendLine("DTSTART:" + startDate.ToString("yyyyMMddTHHmm00"));
+                sb.AppendLine("DTEND:" + startDate.AddMinutes(5).ToString("yyyyMMddTHHmm00"));
 
                 sb.AppendLine($"SUMMARY: {p.FirstName} {p.LastName}");
                 sb.AppendLine("LOCATION:" + "Göteborg" + "");
@@ -218,8 +221,12 @@ namespace Vaccination
                 sb.AppendLine("END:VCALENDAR");
 
 
-
             }
+
+            string calendarItem = sb.ToString();
+
+            File.WriteAllText(newPath, calendarItem);
+
         }
         public static DateTime GetDate()
         {
