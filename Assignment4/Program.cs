@@ -151,15 +151,13 @@ namespace Vaccination
 
         public static void CreateVaccinationCalendar()
         {
-            StringBuilder sb = new StringBuilder();
-            var sortedList = OrderPatients(File.ReadAllLines(inputData),minors);
-            int dosesLeft = doses;
             DateTime startDate = new DateTime();
             string startTime = "08:00";
             string endTime = "20:00";
             int simultaneous = 2;
             int minutesPerVisit = 5;
             string newPath = @"C:\Windows\Temp\Schedule.ics";
+
 
             Console.Clear();
             Console.WriteLine("Schemalägg vaccinationer");
@@ -178,6 +176,7 @@ namespace Vaccination
 
             Console.Write("Antal samtidiga vaccinationer: ");
             
+            
             string inputA = Console.ReadLine();
             if (inputA != "")
                 simultaneous = ReadInt(inputA);
@@ -192,42 +191,84 @@ namespace Vaccination
             if (inputC != "")
                 newPath = inputC;
 
+            if (TimeSpan.Parse(startTime) >= TimeSpan.Parse(endTime))
+                throw new ArgumentException("Sluttiden måste vara senare än starttiden.");
+
+            try
+            {
+                CreateISCfile(startDate, startTime, endTime, simultaneous, minutesPerVisit, newPath);
+                Console.WriteLine($"Resultatet har sparats i {newPath}");
+                Thread.Sleep(1500);
+            }
+            catch
+            {
+                throw new ArgumentException("Fel inträffade vid skapandet av ISC-filen.");
+            }
+
+        }
+
+        public static void CreateISCfile(DateTime startDate, string startTime, string endTime, int simultaneous, int minutesPerVisit, string newPath)
+        {
+            StringBuilder sb = new StringBuilder();
+            var sortedList = OrderPatients(File.ReadAllLines(inputData),minors);
+            int dosesLeft = doses;
 
             //startDate = startDate TimeSpan.Parse(startTime).Hours;
             int sameTime = 0;
+            var newStart = new DateTime(startDate.Year, startDate.Month, startDate.Day, int.Parse(startTime[..startTime.IndexOf(':')]),
+                int.Parse(startTime[(startTime.IndexOf(':')+ 1)..]), 0);
+            var newEnd = new DateTime(startDate.Year, startDate.Month, startDate.Day, int.Parse(endTime[..endTime.IndexOf(':')]),
+                int.Parse(endTime[(endTime.IndexOf(':') + 1)..]), 0);
+            var timeOfVisit = newStart;
+
+            sb.AppendLine("BEGIN:VCALENDAR");
+            sb.AppendLine("VERSION:1.0");
+            sb.AppendLine("PRODID:Folkhälsomyndigheten");
+            sb.AppendLine("CALSCALE:GREGORIAN");
+            sb.AppendLine("METHOD:PUBLISH");
 
             foreach (Patient p in sortedList)
             {
-                startDate.AddMinutes(5);
+                sameTime++;
 
-                sb.AppendLine("BEGIN:VCALENDAR");
-                sb.AppendLine("VERSION:2.0");
-                sb.AppendLine("PRODID:stackoverflow.com");
-                //sb.AppendLine("CALSCALE:GREGORIAN");
-                sb.AppendLine("METHOD:PUBLISH");
+                if (dosesLeft == 0)
+                    break;
+
+                if (timeOfVisit.AddMinutes(minutesPerVisit) > newEnd)
+                {
+                    newStart = newStart.AddDays(1);
+                    newEnd = newEnd.AddDays(1);
+                    timeOfVisit = newStart;
+                }
+
+                if (sameTime > simultaneous)
+                {
+                    timeOfVisit = timeOfVisit.AddMinutes(minutesPerVisit);
+                    sameTime = 1;
+                }
 
                 sb.AppendLine("BEGIN:VEVENT");
-                sb.AppendLine("DTSTAMP:" + startDate.ToString("yyyyMMddTHHmm00"));
-                sb.AppendLine("UID:19970901T130000Z-123401@example.com");
-                sb.AppendLine("DTSTART:" + startDate.ToString("yyyyMMddTHHmm00"));
-                sb.AppendLine("DTEND:" + startDate.AddMinutes(5).ToString("yyyyMMddTHHmm00"));
+                sb.AppendLine("DTSTAMP:" + timeOfVisit.ToString("yyyyMMddTHHmm00"));
+                sb.AppendLine("UID:" + p.BirthNumber + "Z-123401@example.com");
+                sb.AppendLine("DTSTART:" + timeOfVisit.ToString("yyyyMMddTHHmm00"));
+                sb.AppendLine("DTEND:" + timeOfVisit.AddMinutes(minutesPerVisit).ToString("yyyyMMddTHHmm00"));
 
                 sb.AppendLine($"SUMMARY: {p.FirstName} {p.LastName}");
                 sb.AppendLine("LOCATION:" + "Göteborg" + "");
-                sb.AppendLine("DESCRIPTION:" + " 1 dos gift" + "");
+                sb.AppendLine("DESCRIPTION:" + " Första dosen");
                 sb.AppendLine("PRIORITY:3");
                 sb.AppendLine("END:VEVENT");
 
-                sb.AppendLine("END:VCALENDAR");
-
-
+                dosesLeft--;
             }
+
+            sb.AppendLine("END:VCALENDAR");
 
             string calendarItem = sb.ToString();
 
             File.WriteAllText(newPath, calendarItem);
-
         }
+
         public static DateTime GetDate()
         {
             Console.Write("Startdatum (YYYY-MM-DD): ");
@@ -274,7 +315,7 @@ namespace Vaccination
                     time = TimeSpan.Parse(GetTime(prompt));
                 }
 
-                return time.ToString();
+                return time.ToString()[..5];
             }
             else
                 return input;
