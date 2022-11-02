@@ -75,7 +75,10 @@ namespace Vaccination
         private static int doses = 20;
         private static string inputData = @"C:\Windows\Temp\People.csv";
         private static string outputPath = @"C:\Windows\Temp\Vaccinations.csv";
+        private static string iscPath = @"C:\Windows\Temp\Schedule.ics";
         private static bool minors = false;
+
+
 
         public static void Main()
         {
@@ -103,7 +106,7 @@ namespace Vaccination
                     }
                     else if (selected == 1)
                     {
-                        CreateVaccinationCalendar();
+                        WriteISC(CreateVaccinationCalendar());
                     }
                     else if (selected == 2)
                     {
@@ -149,14 +152,13 @@ namespace Vaccination
 
         
 
-        public static void CreateVaccinationCalendar()
+        public static string CreateVaccinationCalendar()
         {
             DateTime startDate = new DateTime();
             string startTime = "08:00";
             string endTime = "20:00";
             int simultaneous = 2;
             int minutesPerVisit = 5;
-            string newPath = @"C:\Windows\Temp\Schedule.ics";
 
 
             Console.Clear();
@@ -189,16 +191,14 @@ namespace Vaccination
 
             string inputC = ReadICSPath("Kalenderfil: ");
             if (inputC != "")
-                newPath = inputC;
+                iscPath = inputC;
 
             if (TimeSpan.Parse(startTime) >= TimeSpan.Parse(endTime))
                 throw new ArgumentException("Sluttiden måste vara senare än starttiden.");
 
             try
             {
-                CreateISCfile(startDate, startTime, endTime, simultaneous, minutesPerVisit, newPath);
-                Console.WriteLine($"Resultatet har sparats i {newPath}");
-                Thread.Sleep(1500);
+                return CreateISCtext(OrderPatients(File.ReadAllLines(inputData), minors),startDate, startTime, endTime, simultaneous, minutesPerVisit, doses);
             }
             catch
             {
@@ -206,14 +206,13 @@ namespace Vaccination
             }
 
         }
-
-        public static void CreateISCfile(DateTime startDate, string startTime, string endTime, int simultaneous, int minutesPerVisit, string newPath)
+         
+        public static string CreateISCtext(List<Patient> input, DateTime startDate, string startTime, string endTime, int simultaneous, int minutesPerVisit, int doses)
         {
             StringBuilder sb = new StringBuilder();
-            var sortedList = OrderPatients(File.ReadAllLines(inputData),minors);
+            var sortedList = input;
             int dosesLeft = doses;
 
-            //startDate = startDate TimeSpan.Parse(startTime).Hours;
             int sameTime = 0;
             var newStart = new DateTime(startDate.Year, startDate.Month, startDate.Day, int.Parse(startTime[..startTime.IndexOf(':')]),
                 int.Parse(startTime[(startTime.IndexOf(':')+ 1)..]), 0);
@@ -234,6 +233,12 @@ namespace Vaccination
                 if (dosesLeft == 0)
                     break;
 
+                if (sameTime > simultaneous)
+                {
+                    timeOfVisit = timeOfVisit.AddMinutes(minutesPerVisit);
+                    sameTime = 1;
+                }
+
                 if (timeOfVisit.AddMinutes(minutesPerVisit) > newEnd)
                 {
                     newStart = newStart.AddDays(1);
@@ -241,11 +246,6 @@ namespace Vaccination
                     timeOfVisit = newStart;
                 }
 
-                if (sameTime > simultaneous)
-                {
-                    timeOfVisit = timeOfVisit.AddMinutes(minutesPerVisit);
-                    sameTime = 1;
-                }
 
                 sb.AppendLine("BEGIN:VEVENT");
                 sb.AppendLine("DTSTAMP:" + timeOfVisit.ToString("yyyyMMddTHHmm00"));
@@ -263,12 +263,45 @@ namespace Vaccination
             }
 
             sb.AppendLine("END:VCALENDAR");
-
-            string calendarItem = sb.ToString();
-
-            File.WriteAllText(newPath, calendarItem);
+            
+            return sb.ToString();
+            
         }
+        public static void WriteISC(string text)
+        {
+            bool write = true;
 
+            // If a file already exists, ask user if they want to overwrite it
+
+            if (File.Exists(iscPath))
+            {
+                int selected = ShowMenu($"Filen {iscPath} finns redan, vill du ersätta innehållet i filen?", new[] { "Ja", "Nej" });
+
+                if (selected == 1)
+                {
+                    write = false;
+                    Console.WriteLine("Filen har inte ändrats");
+                    Thread.Sleep(1500);
+                }
+
+            }
+
+            if (write)
+            {
+                try
+                {
+                    File.WriteAllText(iscPath, text);
+                    Console.WriteLine($"Resultatet har sparats i {iscPath}");
+                    Thread.Sleep(1500);
+                }
+                catch
+                {
+                    Console.WriteLine("Det gick inte att skriva till filen");
+                    Console.WriteLine("Ändra sökväg och försök igen!");
+                    Thread.Sleep(1500);
+                }
+            }
+        }
         public static DateTime GetDate()
         {
             Console.Write("Startdatum (YYYY-MM-DD): ");
@@ -634,6 +667,29 @@ namespace Vaccination
             Assert.AreEqual(output.Length, 2);
             Assert.AreEqual("19810203-2222,Efternamnsson,Eva,2", output[0]);
             Assert.AreEqual("19720906-1111,Elba,Idris,1", output[1]);
+        }
+
+
+        [TestMethod]
+        public void OnlySameDay()
+        {
+
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,1,0"
+            };
+            DateTime dateTime = DateTime.Now.AddDays(7);
+            string startTime = "10:00";
+            string endTime = "11:00";
+            int sameTimePatients = 1;
+            int minutes = 30;
+
+            // Act
+            string output = Program.CreateISCtext(Program.OrderPatients(input, true), dateTime,startTime, endTime, sameTimePatients, minutes, 20);
+
+            // Assert
+            Assert.AreEqual(false, output.Contains(dateTime.AddDays(1).ToString("yyyyMMdd")));
         }
     }
 }
