@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.IO.Pipes;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Security.Cryptography.X509Certificates;
@@ -78,8 +79,6 @@ namespace Vaccination
         private static string iscPath = @"C:\Windows\Temp\Schedule.ics";
         private static bool minors = false;
 
-
-
         public static void Main()
         {
 
@@ -150,10 +149,9 @@ namespace Vaccination
         // doses: the number of vaccine doses available
         // vaccinateChildren: whether to vaccinate people younger than 18
 
-        
-
         public static string CreateVaccinationCalendar()
         {
+            //Variables for CreateISC
             DateTime startDate = new DateTime();
             string startTime = "08:00";
             string endTime = "20:00";
@@ -177,28 +175,27 @@ namespace Vaccination
                 endTime = endTimeInput;
 
             Console.Write("Antal samtidiga vaccinationer: ");
-            
-            
-            string inputA = Console.ReadLine();
-            if (inputA != "")
-                simultaneous = ReadInt(inputA);
+
+            string simultaneousInput = Console.ReadLine();
+            if (simultaneousInput != "")
+                simultaneous = ReadInt(simultaneousInput);
 
 
             Console.Write("Minuter per vaccination: ");
-            string inputB = Console.ReadLine();
-            if (inputB != "")
-                minutesPerVisit = ReadInt(inputB);
+            string minutesInput = Console.ReadLine();
+            if (minutesInput != "")
+                minutesPerVisit = ReadInt(minutesInput);
 
-            string inputC = ReadICSPath("Kalenderfil: ");
-            if (inputC != "")
-                iscPath = inputC;
+            string newPathInput = ReadICSPath("Kalenderfil: ");
+            if (newPathInput != "")
+                iscPath = newPathInput;
 
             if (TimeSpan.Parse(startTime) >= TimeSpan.Parse(endTime))
                 throw new ArgumentException("Sluttiden måste vara senare än starttiden.");
 
             try
             {
-                return CreateISCtext(OrderPatients(File.ReadAllLines(inputData), minors),startDate, startTime, endTime, simultaneous, minutesPerVisit, doses);
+                return CreateISCtext(OrderPatients(File.ReadAllLines(inputData), minors, doses), startDate, startTime, endTime, simultaneous, minutesPerVisit);
             }
             catch
             {
@@ -206,19 +203,18 @@ namespace Vaccination
             }
 
         }
-         
-        public static string CreateISCtext(List<Patient> input, DateTime startDate, string startTime, string endTime, int simultaneous, int minutesPerVisit, int doses)
+
+        public static string CreateISCtext(List<Patient> input, DateTime startDate, string startTime, string endTime, int simultaneous, int minutesPerVisit)
         {
             StringBuilder sb = new StringBuilder();
             var sortedList = input;
-            int dosesLeft = doses;
 
-            //Keep traack of number of patients in the same timeblock
-            int sameTime = 0;
+            //Keep track of number of patients in the same timeblock
+            int sameTimeAppointment = 0;
 
             //New DateTime variables with correct start and end times
             var newStart = new DateTime(startDate.Year, startDate.Month, startDate.Day, int.Parse(startTime[..startTime.IndexOf(':')]),
-                int.Parse(startTime[(startTime.IndexOf(':')+ 1)..]), 0);
+                int.Parse(startTime[(startTime.IndexOf(':') + 1)..]), 0);
             var newEnd = new DateTime(startDate.Year, startDate.Month, startDate.Day, int.Parse(endTime[..endTime.IndexOf(':')]),
                 int.Parse(endTime[(endTime.IndexOf(':') + 1)..]), 0);
             var timeOfVisit = newStart;
@@ -231,16 +227,13 @@ namespace Vaccination
 
             foreach (Patient p in sortedList)
             {
-                sameTime++;
-
-                if (dosesLeft == 0)
-                    break;
+                sameTimeAppointment++;
 
                 //If the max number of patients during this time is full, move to next time instead
-                if (sameTime > simultaneous)
+                if (sameTimeAppointment > simultaneous)
                 {
                     timeOfVisit = timeOfVisit.AddMinutes(minutesPerVisit);
-                    sameTime = 1;
+                    sameTimeAppointment = 1;
                 }
 
                 //If the visit will surpass the end time, move to the next day instead
@@ -251,32 +244,33 @@ namespace Vaccination
                     timeOfVisit = newStart;
                 }
 
+                if (!(timeOfVisit.AddMinutes(minutesPerVisit) > newEnd))
+                {
+                    sb.AppendLine("BEGIN:VEVENT");
+                    sb.AppendLine("DTSTAMP:" + timeOfVisit.ToString("yyyyMMddTHHmm00"));
+                    sb.AppendLine("UID:" + p.BirthNumber + "Z-123401@example.com");
+                    sb.AppendLine("DTSTART:" + timeOfVisit.ToString("yyyyMMddTHHmm00"));
+                    sb.AppendLine("DTEND:" + timeOfVisit.AddMinutes(minutesPerVisit).ToString("yyyyMMddTHHmm00"));
 
-                sb.AppendLine("BEGIN:VEVENT");
-                sb.AppendLine("DTSTAMP:" + timeOfVisit.ToString("yyyyMMddTHHmm00"));
-                sb.AppendLine("UID:" + p.BirthNumber + "Z-123401@example.com");
-                sb.AppendLine("DTSTART:" + timeOfVisit.ToString("yyyyMMddTHHmm00"));
-                sb.AppendLine("DTEND:" + timeOfVisit.AddMinutes(minutesPerVisit).ToString("yyyyMMddTHHmm00"));
-
-                sb.AppendLine($"SUMMARY: {p.FirstName} {p.LastName}");
-                sb.AppendLine("LOCATION:" + "Göteborg" + "");
-                sb.AppendLine("DESCRIPTION:" + " Första dosen");
-                sb.AppendLine("PRIORITY:3");
-                sb.AppendLine("END:VEVENT");
-
-                dosesLeft--;
+                    sb.AppendLine($"SUMMARY: {p.FirstName} {p.LastName}");
+                    sb.AppendLine("LOCATION:" + "Göteborg" + "");
+                    sb.AppendLine("DESCRIPTION:" + " Första dosen");
+                    sb.AppendLine("PRIORITY:3");
+                    sb.AppendLine("END:VEVENT");
+                }
             }
 
             sb.AppendLine("END:VCALENDAR");
-            
+
             return sb.ToString();
         }
 
-        public static List<Patient> OrderPatients(string[] input, bool vaccinateChildren)
+        public static List<Patient> OrderPatients(string[] input, bool vaccinateChildren, int doses)
         {
-
+            int dosesLeft = doses;
             int errorCount = 0;
-            List<Patient> sortedList = new List<Patient>();
+            List<Patient> sortedList = new List<Patient>(); 
+            List<Patient> getsVaccinated = new List<Patient>();
 
             foreach (string person in input)
             {
@@ -301,32 +295,38 @@ namespace Vaccination
 
             }
 
+            if (!vaccinateChildren)
+                sortedList = sortedList.Where(x => x.Age >= 18).ToList();
+
+            sortedList = sortedList.OrderBy(x => x.VaccinationGroup).ThenBy(x => int.Parse(x.BirthNumber[..8])).ToList();
+
+            foreach (Patient patient in sortedList)
+            {
+                if (dosesLeft >= patient.DosesGet)
+                {
+                    getsVaccinated.Add(patient);
+                    dosesLeft -= patient.DosesGet;
+                }
+                else
+                    break;
+            }
+
             if (errorCount > 0)
             {
                 throw new ArgumentException($"Fel vid inläsning av CSV-fil på {errorCount} rader.");
             }
-            if (!vaccinateChildren)
-                sortedList = sortedList.Where(x => x.Age >= 18).ToList();
 
-            return sortedList.OrderBy(x => x.VaccinationGroup).ThenBy(x => int.Parse(x.BirthNumber[..8])).ToList();
-
-
-
+            return getsVaccinated;
         }
 
         public static string[] CreateVaccinationOrder(string[] input, int doses, bool vaccinateChildren)
         {
-            int dosesLeft = doses;
-            var orderedList = OrderPatients(input, vaccinateChildren);
+            var orderedList = OrderPatients(input, vaccinateChildren, doses);
             List<string> finalList = new List<string>();
 
             foreach (Patient person in orderedList)
             {
-                if (dosesLeft >= person.DosesGet)
-                {
                     finalList.Add($"{person.BirthNumber},{person.LastName},{person.FirstName},{person.DosesGet}");
-                    dosesLeft -= person.DosesGet;
-                }
             }
 
             return finalList.ToArray();
@@ -424,7 +424,6 @@ namespace Vaccination
                 {
                     Console.WriteLine("Felaktigt format - Prova igen.");
                     Thread.Sleep(1500);
-                    Console.Clear();
                     chosenDate = GetDate();
                 }
 
@@ -652,12 +651,48 @@ namespace Vaccination
         }
     }
 
+    //
+    //
+    // ***TESTS BELOW***
+
     [TestClass]
     public class ProgramTests
     {
         // Tests for CreateISCtext
         [TestMethod]
-        public void OnlySameDay()
+        public void ThirdWheelVaxxer()
+        {
+
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,1,1",
+                "8102032222,Jolie,Angelina,1,1,0",
+                "820723-2132,Pitt,Brad,0,0,0"
+            };
+            DateTime dateTime = DateTime.Parse("2022-10-12");
+            string startTime = "10:00";
+            string endTime = "12:00";
+            int sameTimePatients = 2;
+            int minutes = 60;
+            int doses = 20;
+
+            // Act
+            string[] output = Program.CreateISCtext(Program.OrderPatients(input, true, doses), dateTime, startTime, endTime, sameTimePatients, minutes)
+                .Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+            // Assert
+            //Only 2 patients in 1st timeblock
+            Assert.AreEqual("DTSTART:20221012T100000", output[8]);
+            Assert.AreEqual("DTEND:20221012T110000", output[9]);
+            Assert.AreEqual(output[9], output[19]);
+            Assert.AreEqual(output[8], output[18]);
+            Assert.AreEqual("UID:19820723-2132Z-123401@example.com", output[27]);
+            Assert.AreEqual("DTSTART:20221012T110000", output[28]);
+            Assert.AreEqual("DTEND:20221012T120000", output[29]);
+        }
+
+        [TestMethod]
+        public void SameTimeVax()
         {
 
             string[] input =
@@ -665,23 +700,164 @@ namespace Vaccination
                 "19720906-1111,Elba,Idris,0,0,1",
                 "8102032222,Efternamnsson,Eva,1,1,0"
             };
-            DateTime dateTime = DateTime.Now.AddDays(7);
+            DateTime dateTime = DateTime.Parse("2022-10-12");
+            string startTime = "10:00";
+            string endTime = "12:00";
+            int sameTimePatients = 2;
+            int minutes = 60;
+            int doses = 20;
+
+            // Act
+            string[] output = Program.CreateISCtext(Program.OrderPatients(input, true, doses), dateTime, startTime, endTime, sameTimePatients, minutes)
+                .Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+            // Assert
+            //Both appointments should fit in 1 day
+            Assert.AreEqual("DTSTART:20221012T100000", output[8]);
+            Assert.AreEqual("DTEND:20221012T110000", output[9]);
+            Assert.AreEqual(output[9], output[19]);
+            Assert.AreEqual(output[8], output[18]);
+
+        }
+
+        [TestMethod]
+        public void SameDayVax()
+        {
+
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,1,0"
+            };
+            DateTime dateTime = DateTime.Parse("2022-10-12");
             string startTime = "10:00";
             string endTime = "11:00";
             int sameTimePatients = 1;
             int minutes = 30;
+            int doses = 20;
 
             // Act
-            string output = Program.CreateISCtext(Program.OrderPatients(input, true), dateTime,startTime, endTime, sameTimePatients, minutes, 20);
+            string[] output = Program.CreateISCtext(Program.OrderPatients(input, true, doses), dateTime, startTime, endTime, sameTimePatients, minutes)
+                .Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
 
             // Assert
-            Assert.AreEqual(false, output.Contains(dateTime.AddDays(1).ToString("yyyyMMdd")));
+            //Both appointments should fit in 1 day
+            Assert.AreEqual("DTEND:20221012T103000", output[9]);
+            Assert.AreEqual("DTEND:20221012T110000", output[19]);
+        }
+
+        [TestMethod]
+        public void OneMinOverTime()
+        {
+
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,1,0"
+            };
+            DateTime dateTime = DateTime.Parse("2022-10-12");
+            string startTime = "10:00";
+            string endTime = "11:00";
+            int sameTimePatients = 1;
+            int minutes = 31;
+            int doses = 20;
+
+            // Act
+            string[] output = Program.CreateISCtext(Program.OrderPatients(input, true, doses), dateTime, startTime, endTime, sameTimePatients, minutes)
+                .Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+            // Assert
+            //No time for both in 1 day
+            Assert.AreEqual("DTSTART:20221012T100000", output[8]);
+            Assert.AreEqual("DTEND:20221012T103100", output[9]);
+            Assert.AreEqual("DTSTART:20221013T100000", output[18]);
+            Assert.AreEqual("DTEND:20221013T103100", output[19]);
+        }
+
+
+        [TestMethod]
+        public void NoTimeForAppointment()
+        {
+
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,1,0"
+            };
+            DateTime dateTime = DateTime.Parse("2022-10-12");
+            string startTime = "10:00";
+            string endTime = "11:00";
+            int sameTimePatients = 2;
+            int minutes = 61;
+            int doses = 20;
+            // Act
+            //Produces invalid ISC file with no events
+            string[] output = Program.CreateISCtext(Program.OrderPatients(input, true, doses), dateTime, startTime, endTime, sameTimePatients, minutes)
+                .Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+            // Assert
+            Assert.AreEqual("BEGIN:VCALENDAR", output[0]);
+            Assert.AreEqual(false, "BEGIN:VEVENT" == output[5]);
+            Assert.AreEqual(false, output.Contains("BEGIN:VEVENT")); 
+        }
+
+        [TestMethod]
+        public void EmptyInputList()
+        {
+
+            string[] input =
+            {
+            };
+            DateTime dateTime = DateTime.Parse("2022-10-12");
+            string startTime = "10:00";
+            string endTime = "11:00";
+            int sameTimePatients = 1;
+            int minutes = 30;
+            int doses = 20;
+
+            // Act
+            string[] output = Program.CreateISCtext(Program.OrderPatients(input, true, doses), dateTime, startTime, endTime, sameTimePatients, minutes)
+                .Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+            // Assert
+            Assert.AreEqual("BEGIN:VCALENDAR", output[0]);
+            Assert.AreEqual(false, "BEGIN:VEVENT" == output[5]);
+            Assert.AreEqual(false, output.Contains("BEGIN:VEVENT"));
+        }
+
+        [TestMethod]
+        public void FuturisticSpecialVax()
+        {
+
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,1,0"
+            };
+            DateTime dateTime = DateTime.Parse("2032-01-01");
+            string startTime = "00:00";
+            string endTime = "12:00";
+            int sameTimePatients = 1;
+            int minutes = 360;
+            int doses = 3;
+
+            // Act
+            string[] output = Program.CreateISCtext(Program.OrderPatients(input, true, doses), dateTime, startTime, endTime, sameTimePatients, minutes)
+                .Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+            // Assert
+            Assert.AreEqual("UID:19810203-2222Z-123401@example.com", output[7]);
+            Assert.AreEqual("DTSTART:20320101T000000", output[8]);
+            Assert.AreEqual("DTEND:20320101T060000", output[9]);
+            Assert.AreEqual("UID:19720906-1111Z-123401@example.com", output[17]);
+            Assert.AreEqual("DTSTART:20320101T060000", output[18]);
+            Assert.AreEqual("DTEND:20320101T120000", output[19]);
         }
 
 
         // Tests for CreateVaccinationOrder
         [TestMethod]
-        public void StandardTest()
+        public void StandardOrderTest()
         {
             // Arrange
             string[] input =
@@ -702,7 +878,7 @@ namespace Vaccination
         }
 
         [TestMethod]
-        public void MinorTest()
+        public void VaxMinorTest()
         {
             // Arrange
             string[] input =
@@ -742,7 +918,7 @@ namespace Vaccination
             Assert.AreEqual("19940203-2222,Efternamnsson,Alex,2", output[0]);
         }
         [TestMethod]
-        public void SecondDose()
+        public void OneDose()
         {
             // Arrange
             string[] input =
@@ -806,7 +982,49 @@ namespace Vaccination
             Assert.AreEqual("19810303-2222,Rickard,Evasson,1", output[2]);
             Assert.AreEqual("19720906-1111,Elba,Idris,1", output[3]);
         }
+        [TestMethod]
+        public void SortsByGroupThenAge()
+        {
+            // Arrange
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,1,0,1",
+                "500906-1111,Alex,Gru,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,0,0",
+                "5009052222,Rickard,Evasson,0,1,1"
+            };
+            int doses = 5;
+            bool vaccinateChildren = false;
 
+            // Act
+            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
+
+            // Assert
+            Assert.AreEqual(output.Length, 4);
+            Assert.AreEqual("19720906-1111,Elba,Idris,1", output[0]);
+            Assert.AreEqual("19810203-2222,Efternamnsson,Eva,2", output[1]);
+            Assert.AreEqual("19500905-2222,Rickard,Evasson,1", output[2]);
+            Assert.AreEqual("19500906-1111,Alex,Gru,1", output[3]);
+        }
+
+        [TestMethod]
+        public void EnoughDosesButTooFewForFirst()
+        {
+            // Arrange
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,1,0"
+            };
+            int doses = 1;
+            bool vaccinateChildren = false;
+
+            // Act
+            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
+
+            // Assert
+            Assert.AreEqual(output.Length, 0);
+        }
 
     }
 }
