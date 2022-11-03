@@ -649,7 +649,7 @@ namespace Vaccination
 
 
         [TestMethod]
-        public void ExampleTest()
+        public void IdrisAndEva()
         {
             // Arrange
             string[] input =
@@ -668,6 +668,8 @@ namespace Vaccination
             Assert.AreEqual("19810203-2222,Efternamnsson,Eva,2", output[0]);
             Assert.AreEqual("19720906-1111,Elba,Idris,1", output[1]);
         }
+
+
 
 
         [TestMethod]
@@ -690,6 +692,27 @@ namespace Vaccination
 
             // Assert
             Assert.AreEqual(false, output.Contains(dateTime.AddDays(1).ToString("yyyyMMdd")));
+        }
+
+        [TestMethod]
+        public void MinorTest()
+        {
+            // Arrange
+            string[] input =
+            {
+                "20050906-1111,Thunborg,Rickard,0,1,0",
+                "9402032222,Efternamnsson,Alex,1,0,0"
+            };
+            int doses = 10;
+            bool vaccinateChildren = true;
+
+            // Act
+            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
+
+            // Assert
+            Assert.AreEqual(output.Length, 2);
+            Assert.AreEqual("19940203-2222,Efternamnsson,Alex,2", output[0]);
+            Assert.AreEqual("20050906-1111,Thunborg,Rickard,2", output[1]);
         }
     }
 }
