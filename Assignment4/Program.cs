@@ -213,7 +213,10 @@ namespace Vaccination
             var sortedList = input;
             int dosesLeft = doses;
 
+            //Keep traack of number of patients in the same timeblock
             int sameTime = 0;
+
+            //New DateTime variables with correct start and end times
             var newStart = new DateTime(startDate.Year, startDate.Month, startDate.Day, int.Parse(startTime[..startTime.IndexOf(':')]),
                 int.Parse(startTime[(startTime.IndexOf(':')+ 1)..]), 0);
             var newEnd = new DateTime(startDate.Year, startDate.Month, startDate.Day, int.Parse(endTime[..endTime.IndexOf(':')]),
@@ -233,12 +236,14 @@ namespace Vaccination
                 if (dosesLeft == 0)
                     break;
 
+                //If the max number of patients during this time is full, move to next time instead
                 if (sameTime > simultaneous)
                 {
                     timeOfVisit = timeOfVisit.AddMinutes(minutesPerVisit);
                     sameTime = 1;
                 }
 
+                //If the visit will surpass the end time, move to the next day instead
                 if (timeOfVisit.AddMinutes(minutesPerVisit) > newEnd)
                 {
                     newStart = newStart.AddDays(1);
@@ -265,94 +270,6 @@ namespace Vaccination
             sb.AppendLine("END:VCALENDAR");
             
             return sb.ToString();
-            
-        }
-        public static void WriteISC(string text)
-        {
-            bool write = true;
-
-            // If a file already exists, ask user if they want to overwrite it
-
-            if (File.Exists(iscPath))
-            {
-                int selected = ShowMenu($"Filen {iscPath} finns redan, vill du ersätta innehållet i filen?", new[] { "Ja", "Nej" });
-
-                if (selected == 1)
-                {
-                    write = false;
-                    Console.WriteLine("Filen har inte ändrats");
-                    Thread.Sleep(1500);
-                }
-
-            }
-
-            if (write)
-            {
-                try
-                {
-                    File.WriteAllText(iscPath, text);
-                    Console.WriteLine($"Resultatet har sparats i {iscPath}");
-                    Thread.Sleep(1500);
-                }
-                catch
-                {
-                    Console.WriteLine("Det gick inte att skriva till filen");
-                    Console.WriteLine("Ändra sökväg och försök igen!");
-                    Thread.Sleep(1500);
-                }
-            }
-        }
-        public static DateTime GetDate()
-        {
-            Console.Write("Startdatum (YYYY-MM-DD): ");
-            string input = Console.ReadLine();
-
-            DateTime chosenDate;
-
-            if (input != "")
-            {
-                try
-                {
-                    chosenDate = DateTime.Parse(input);
-                }
-                catch
-                {
-                    Console.WriteLine("Felaktigt format - Prova igen.");
-                    Thread.Sleep(1500);
-                    Console.Clear();
-                    chosenDate = GetDate();
-                }
-
-            }
-            else
-            {
-                chosenDate = DateTime.Now.AddDays(7);
-
-            }
-
-            return chosenDate;
-        }
-
-        public static string GetTime(string prompt)
-        {
-            Console.Write(prompt);
-            string input = Console.ReadLine();
-            TimeSpan time;
-            if (input != "")
-            {
-                if (TimeSpan.TryParse(input, out time))
-                    time = TimeSpan.Parse(input);
-                else
-                {
-                    Console.WriteLine("Felaktigt format");
-                    time = TimeSpan.Parse(GetTime(prompt));
-                }
-
-                return time.ToString()[..5];
-            }
-            else
-                return input;
-
         }
 
         public static List<Patient> OrderPatients(string[] input, bool vaccinateChildren)
@@ -416,6 +333,43 @@ namespace Vaccination
 
         }
 
+
+        //Methods for writing content to files
+        public static void WriteISC(string text)
+        {
+            bool write = true;
+
+            // If a file already exists, ask user if they want to overwrite it
+
+            if (File.Exists(iscPath))
+            {
+                int selected = ShowMenu($"Filen {iscPath} finns redan, vill du ersätta innehållet i filen?", new[] { "Ja", "Nej" });
+
+                if (selected == 1)
+                {
+                    write = false;
+                    Console.WriteLine("Filen har inte ändrats");
+                    Thread.Sleep(1500);
+                }
+
+            }
+
+            if (write)
+            {
+                try
+                {
+                    File.WriteAllText(iscPath, text);
+                    Console.WriteLine($"Resultatet har sparats i {iscPath}");
+                    Thread.Sleep(1500);
+                }
+                catch
+                {
+                    Console.WriteLine("Det gick inte att skriva till filen");
+                    Console.WriteLine("Ändra sökväg och försök igen!");
+                    Thread.Sleep(1500);
+                }
+            }
+        }
         public static void WriteCSV(string[] input)
         {
             Console.Clear();
@@ -449,6 +403,61 @@ namespace Vaccination
                     Thread.Sleep(1500);
                 }
             }
+        }
+
+
+        //Below are methods for reading user input, along with error-handling
+        public static DateTime GetDate()
+        {
+            Console.Write("Startdatum (YYYY-MM-DD): ");
+            string input = Console.ReadLine();
+
+            DateTime chosenDate;
+
+            if (input != "")
+            {
+                try
+                {
+                    chosenDate = DateTime.Parse(input);
+                }
+                catch
+                {
+                    Console.WriteLine("Felaktigt format - Prova igen.");
+                    Thread.Sleep(1500);
+                    Console.Clear();
+                    chosenDate = GetDate();
+                }
+
+            }
+            else
+            {
+                chosenDate = DateTime.Now.AddDays(7);
+
+            }
+
+            return chosenDate;
+        }
+
+        public static string GetTime(string prompt)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine();
+            TimeSpan time;
+            if (input != "")
+            {
+                if (TimeSpan.TryParse(input, out time))
+                    time = TimeSpan.Parse(input);
+                else
+                {
+                    Console.WriteLine("Felaktigt format");
+                    time = TimeSpan.Parse(GetTime(prompt));
+                }
+
+                return time.ToString()[..5];
+            }
+            else
+                return input;
+
         }
 
         public static string ReadNewPath(bool checkFile)
