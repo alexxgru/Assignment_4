@@ -655,32 +655,6 @@ namespace Vaccination
     [TestClass]
     public class ProgramTests
     {
-
-
-        [TestMethod]
-        public void StandardTest()
-        {
-            // Arrange
-            string[] input =
-            {
-                "19720906-1111,Elba,Idris,0,0,0",
-                "8102032222,Efternamnsson,Eva,1,1,0"
-            };
-            int doses = 10;
-            bool vaccinateChildren = false;
-
-            // Act
-            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
-
-            // Assert
-            Assert.AreEqual(output.Length, 2);
-            Assert.AreEqual("19810203-2222,Efternamnsson,Eva,2", output[0]);
-            Assert.AreEqual("19720906-1111,Elba,Idris,2", output[1]);
-        }
-
-
-
-
         [TestMethod]
         public void OnlySameDay()
         {
@@ -701,6 +675,27 @@ namespace Vaccination
 
             // Assert
             Assert.AreEqual(false, output.Contains(dateTime.AddDays(1).ToString("yyyyMMdd")));
+        }
+
+        [TestMethod]
+        public void StandardTest()
+        {
+            // Arrange
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,0",
+                "8102032222,Efternamnsson,Eva,1,1,0"
+            };
+            int doses = 10;
+            bool vaccinateChildren = false;
+
+            // Act
+            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
+
+            // Assert
+            Assert.AreEqual(output.Length, 2);
+            Assert.AreEqual("19810203-2222,Efternamnsson,Eva,2", output[0]);
+            Assert.AreEqual("19720906-1111,Elba,Idris,2", output[1]);
         }
 
         [TestMethod]
