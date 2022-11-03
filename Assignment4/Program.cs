@@ -655,6 +655,7 @@ namespace Vaccination
     [TestClass]
     public class ProgramTests
     {
+        // Tests for CreateISCtext
         [TestMethod]
         public void OnlySameDay()
         {
@@ -677,6 +678,8 @@ namespace Vaccination
             Assert.AreEqual(false, output.Contains(dateTime.AddDays(1).ToString("yyyyMMdd")));
         }
 
+
+        // Tests for CreateVaccinationOrder
         [TestMethod]
         public void StandardTest()
         {
@@ -778,5 +781,32 @@ namespace Vaccination
             Assert.AreEqual(output.Length, 1);
             Assert.AreEqual("19810203-2222,Efternamnsson,Eva,1", output[0]);
         }
+
+        [TestMethod]
+        public void SortsByGroup()
+        {
+            // Arrange
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,0,0",
+                "500906-1111,Alex,Gru,0,0,1",
+                "8103032222,Rickard,Evasson,0,1,1"
+            };
+            int doses = 5;
+            bool vaccinateChildren = false;
+
+            // Act
+            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
+
+            // Assert
+            Assert.AreEqual(output.Length, 4);
+            Assert.AreEqual("19810203-2222,Efternamnsson,Eva,2", output[0]);
+            Assert.AreEqual("19500906-1111,Alex,Gru,1", output[1]);
+            Assert.AreEqual("19810303-2222,Rickard,Evasson,1", output[2]);
+            Assert.AreEqual("19720906-1111,Elba,Idris,1", output[3]);
+        }
+
+
     }
 }
