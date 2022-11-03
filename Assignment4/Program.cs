@@ -658,12 +658,12 @@ namespace Vaccination
 
 
         [TestMethod]
-        public void IdrisAndEva()
+        public void StandardTest()
         {
             // Arrange
             string[] input =
             {
-                "19720906-1111,Elba,Idris,0,0,1",
+                "19720906-1111,Elba,Idris,0,0,0",
                 "8102032222,Efternamnsson,Eva,1,1,0"
             };
             int doses = 10;
@@ -675,7 +675,7 @@ namespace Vaccination
             // Assert
             Assert.AreEqual(output.Length, 2);
             Assert.AreEqual("19810203-2222,Efternamnsson,Eva,2", output[0]);
-            Assert.AreEqual("19720906-1111,Elba,Idris,1", output[1]);
+            Assert.AreEqual("19720906-1111,Elba,Idris,2", output[1]);
         }
 
 
@@ -722,6 +722,66 @@ namespace Vaccination
             Assert.AreEqual(output.Length, 2);
             Assert.AreEqual("19940203-2222,Efternamnsson,Alex,2", output[0]);
             Assert.AreEqual("20050906-1111,Thunborg,Rickard,2", output[1]);
+        }
+
+        [TestMethod]
+        public void NoMinorTest()
+        {
+            // Arrange
+            string[] input =
+            {
+                "20050906-1111,Thunborg,Rickard,0,1,0",
+                "9402032222,Efternamnsson,Alex,1,0,0"
+            };
+            int doses = 10;
+            bool vaccinateChildren = false;
+
+            // Act
+            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
+
+            // Assert
+            Assert.AreEqual(output.Length, 1);
+            Assert.AreEqual("19940203-2222,Efternamnsson,Alex,2", output[0]);
+        }
+        [TestMethod]
+        public void SecondDose()
+        {
+            // Arrange
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,1,1"
+            };
+            int doses = 10;
+            bool vaccinateChildren = false;
+
+            // Act
+            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
+
+            // Assert
+            Assert.AreEqual(output.Length, 2);
+            Assert.AreEqual("19810203-2222,Efternamnsson,Eva,1", output[0]);
+            Assert.AreEqual("19720906-1111,Elba,Idris,1", output[1]);
+        }
+
+        [TestMethod]
+        public void TooFewDoses()
+        {
+            // Arrange
+            string[] input =
+            {
+                "19720906-1111,Elba,Idris,0,0,1",
+                "8102032222,Efternamnsson,Eva,1,1,1"
+            };
+            int doses = 1;
+            bool vaccinateChildren = false;
+
+            // Act
+            string[] output = Program.CreateVaccinationOrder(input, doses, vaccinateChildren);
+
+            // Assert
+            Assert.AreEqual(output.Length, 1);
+            Assert.AreEqual("19810203-2222,Efternamnsson,Eva,1", output[0]);
         }
     }
 }
